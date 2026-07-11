@@ -118,10 +118,31 @@ def train(
     )
 
     # Reload the saved best checkpoint before validation evaluation.
-    best_model = tf.keras.models.load_model(paths.models_dir / "retina_model.keras")
+    model_path = paths.models_dir / "retina_model.keras"
+    print("=" * 60)
+    print(f"Expected model path: {model_path}")
+    print(f"Model exists: {model_path.exists()}")
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"ModelCheckpoint did not produce the expected file: {model_path}"
+        )
+    print(f"Model size: {model_path.stat().st_size / (1024 * 1024):.2f} MB")
+    print("=" * 60)
+
+    best_model = tf.keras.models.load_model(model_path)
     probabilities = best_model.predict(evaluation_sequence, verbose=1)
     metrics = evaluate_predictions(evaluation_data["diagnosis"].to_numpy(), probabilities)
     save_history_and_plots(history.history, paths.models_dir)
+    final_model_path = paths.models_dir / "retina_model_final.keras"
+    best_model.save(final_model_path)
+
+    print("Best checkpoint saved successfully.")
+    print(model_path.resolve())
+    print("Final model saved successfully.")
+    print(final_model_path.resolve())
+    print("Files in models directory:")
+    for file in sorted(paths.models_dir.iterdir()):
+        print(file.resolve())
     return metrics
 
 
