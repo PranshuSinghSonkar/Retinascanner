@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments and environment files
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+
+# Data and generated artifacts
+dataset/raw/
+dataset/processed/
+dataset/train/
+dataset/validation/
+dataset/test/
+models/
+static/uploads/
+reports/pdf/
+reports/figures/
+*.h5
+*.hdf5
+*.keras
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Databases and logs
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+logs/
+*.log
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs and OS files
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
