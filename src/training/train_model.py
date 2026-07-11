@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +14,59 @@ from sklearn.utils.class_weight import compute_class_weight
 from src.training.data_loader import AptosSequence, load_split
 from src.training.evaluation import evaluate_predictions, save_history_and_plots
 from src.training.model import build_model
+
+
+KAGGLE_DATASET_DIR = Path("/kaggle/input/datasets/mariaherrerot/aptos2019")
+KAGGLE_WORKING_MODELS_DIR = Path("/kaggle/working/models")
+
+
+@dataclass(frozen=True)
+class TrainingPaths:
+    """CSV, image, and output locations for a training environment."""
+
+    train_csv: Path
+    validation_csv: Path
+    evaluation_csv: Path
+    train_images_dir: Path
+    validation_images_dir: Path
+    evaluation_images_dir: Path
+    models_dir: Path
+
+
+def running_on_kaggle() -> bool:
+    """Return whether the program is executing inside a Kaggle notebook runtime."""
+    return bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")) or Path("/kaggle/input").exists()
+
+
+def resolve_training_paths(project_root: Path | None = None) -> TrainingPaths:
+    """Resolve Kaggle input paths or the existing local project paths.
+
+    Kaggle's supplied train/validation/test manifests are used directly; no
+    local ``dataset/processed`` split manifests are read in that environment.
+    """
+    if running_on_kaggle():
+        return TrainingPaths(
+            train_csv=KAGGLE_DATASET_DIR / "train_1.csv",
+            validation_csv=KAGGLE_DATASET_DIR / "valid.csv",
+            evaluation_csv=KAGGLE_DATASET_DIR / "test.csv",
+            train_images_dir=KAGGLE_DATASET_DIR / "train_images" / "train_images",
+            validation_images_dir=KAGGLE_DATASET_DIR / "val_images" / "val_images",
+            evaluation_images_dir=KAGGLE_DATASET_DIR / "test_images" / "test_images",
+            models_dir=KAGGLE_WORKING_MODELS_DIR,
+        )
+
+    root = Path.cwd() if project_root is None else Path(project_root)
+    processed_dir = root / "dataset" / "processed"
+    images_dir = root / "dataset" / "raw" / "train_images" / "train_images"
+    return TrainingPaths(
+        train_csv=processed_dir / "train_split.csv",
+        validation_csv=processed_dir / "val_split.csv",
+        evaluation_csv=processed_dir / "test_split.csv",
+        train_images_dir=images_dir,
+        validation_images_dir=images_dir,
+        evaluation_images_dir=images_dir,
+        models_dir=root / "models",
+    )
 
 
 def compute_class_weights(labels: np.ndarray) -> dict[int, float]:
@@ -38,20 +93,20 @@ def training_callbacks(models_dir: Path) -> list[tf.keras.callbacks.Callback]:
 
 
 def train(
-    processed_dir: Path,
-    images_dir: Path,
-    models_dir: Path,
+    paths: TrainingPaths,
     batch_size: int = 16,
     epochs: int = 30,
 ) -> dict[str, object]:
     """Train, evaluate, and save an EfficientNetB0 diabetic-retinopathy model."""
-    train_data = load_split(processed_dir / "train_split.csv")
-    validation_data = load_split(processed_dir / "val_split.csv")
+    train_data = load_split(paths.train_csv)
+    validation_data = load_split(paths.validation_csv)
+    evaluation_data = load_split(paths.evaluation_csv)
 
-    train_sequence = AptosSequence(train_data, images_dir, batch_size, augment=True, shuffle=True)
-    validation_sequence = AptosSequence(validation_data, images_dir, batch_size, augment=False)
+    train_sequence = AptosSequence(train_data, paths.train_images_dir, batch_size, augment=True, shuffle=True)
+    validation_sequence = AptosSequence(validation_data, paths.validation_images_dir, batch_size, augment=False)
+    evaluation_sequence = AptosSequence(evaluation_data, paths.evaluation_images_dir, batch_size, augment=False)
 
-    models_dir.mkdir(parents=True, exist_ok=True)
+    paths.models_dir.mkdir(parents=True, exist_ok=True)
     model, _ = build_model()
     class_weights = compute_class_weights(train_data["diagnosis"].to_numpy())
     history = model.fit(
@@ -59,14 +114,14 @@ def train(
         validation_data=validation_sequence,
         epochs=epochs,
         class_weight=class_weights,
-        callbacks=training_callbacks(models_dir),
+        callbacks=training_callbacks(paths.models_dir),
     )
 
     # Reload the saved best checkpoint before validation evaluation.
-    best_model = tf.keras.models.load_model(models_dir / "retina_model.keras")
-    probabilities = best_model.predict(validation_sequence, verbose=1)
-    metrics = evaluate_predictions(validation_data["diagnosis"].to_numpy(), probabilities)
-    save_history_and_plots(history.history, models_dir)
+    best_model = tf.keras.models.load_model(paths.models_dir / "retina_model.keras")
+    probabilities = best_model.predict(evaluation_sequence, verbose=1)
+    metrics = evaluate_predictions(evaluation_data["diagnosis"].to_numpy(), probabilities)
+    save_history_and_plots(history.history, paths.models_dir)
     return metrics
 
 
@@ -83,20 +138,15 @@ def print_metrics(metrics: dict[str, object]) -> None:
 def main() -> None:
     """Train from the standard RetinaAI project layout."""
     parser = argparse.ArgumentParser(description="Train the RetinaAI EfficientNetB0 classifier.")
-    parser.add_argument("--processed-dir", type=Path, default=Path("dataset/processed"))
-    parser.add_argument("--images-dir", type=Path, default=Path("dataset/raw/train_images/train_images"))
-    parser.add_argument("--models-dir", type=Path, default=Path("models"))
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--epochs", type=int, default=30)
     args = parser.parse_args()
 
-    metrics = train(
-        args.processed_dir,
-        args.images_dir,
-        args.models_dir,
-        batch_size=args.batch_size,
-        epochs=args.epochs,
-    )
+    paths = resolve_training_paths()
+    environment = "Kaggle" if running_on_kaggle() else "local"
+    print(f"Training environment: {environment}")
+    print(f"Model output directory: {paths.models_dir}")
+    metrics = train(paths, batch_size=args.batch_size, epochs=args.epochs)
     print_metrics(metrics)
 
 
