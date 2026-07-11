@@ -16,14 +16,13 @@ def build_model(
 ) -> tuple[tf.keras.Model, tf.keras.Model]:
     """Create a frozen ImageNet-pretrained EfficientNetB0 classifier.
 
-    Input images must already be RGB float32 tensors in the 0–1 range, as
-    produced by ``RetinaImagePreprocessor``.
+    Inputs are preprocessed in the data pipeline with EfficientNet's official
+    ``preprocess_input`` function before they reach the model.
     """
     backbone = tf.keras.applications.EfficientNetB0(
         include_top=False,
         weights="imagenet",
         input_shape=input_shape,
-        include_preprocessing=False,
     )
     backbone.trainable = False
 

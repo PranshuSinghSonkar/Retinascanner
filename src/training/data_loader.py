@@ -43,6 +43,9 @@ class AptosSequence(tf.keras.utils.Sequence):
         images = np.stack(
             [self.preprocessor.load_image(row.id_code, augment=self.augment) for row in batch.itertuples()]
         )
+        # The shared preprocessor returns RGB floats in 0–1. EfficientNetB0
+        # expects the ImageNet input convention used by its pretrained model.
+        images = tf.keras.applications.efficientnet.preprocess_input(images * 255.0)
         labels = tf.keras.utils.to_categorical(batch["diagnosis"].astype(int), self.num_classes)
         return images.astype(np.float32), labels.astype(np.float32)
 
