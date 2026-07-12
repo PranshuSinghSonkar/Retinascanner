@@ -20,6 +20,22 @@ def _allowed_file(filename: str) -> bool:
 
 def create_app() -> Flask:
     """Create and configure the RetinaAI Flask application."""
+    import sys
+
+    _model_path = Path(__file__).resolve().parent / "models" / "retina_model.keras"
+
+    print("RetinaAI Starting...")
+    if _model_path.exists():
+        print(f"Model found: {_model_path}")
+    else:
+        raise RuntimeError(
+            "Production model not found: models/retina_model.keras"
+        )
+
+    import tensorflow as tf
+    print(f"Python version: {sys.version}")
+    print(f"TensorFlow version: {tf.__version__}")
+
     app = Flask(__name__)
     app.config.from_object("config.Config")
     Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)

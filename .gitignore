@@ -34,13 +34,14 @@ dataset/processed/
 dataset/train/
 dataset/validation/
 dataset/test/
-models/
+models/*
 static/uploads/
 reports/pdf/
 reports/figures/
 *.h5
 *.hdf5
 *.keras
+!models/retina_model.keras
 *.onnx
 *.pt
 *.pth
