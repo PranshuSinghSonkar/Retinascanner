@@ -13,6 +13,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from src.visualization.gradcam import generate_gradcam
+
 
 CLASSIFICATIONS = {
     0: {
@@ -61,8 +63,9 @@ CLASSIFICATIONS = {
 class PredictionService:
     """Lazy-loading service that isolates model inference from Flask routes."""
 
-    def __init__(self, models_dir: Path) -> None:
+    def __init__(self, models_dir: Path, uploads_dir: Path | None = None) -> None:
         self.model_path = models_dir / "retina_model.keras"
+        self.heatmaps_dir = (uploads_dir or models_dir.parent / "static" / "uploads") / "heatmaps"
         self._model = None
 
     def _load_model(self):
@@ -98,6 +101,19 @@ class PredictionService:
                 "labels": [CLASSIFICATIONS[index]["name"] for index in range(5)],
             }
         )
+        try:
+            heatmap_path = generate_gradcam(
+                model=model,
+                image_batch=self._prepare_image(image_path),
+                predicted_class=predicted_class,
+                source_image_path=image_path,
+                output_dir=self.heatmaps_dir,
+            )
+            details["heatmap_path"] = str(heatmap_path)
+        except Exception:
+            details["gradcam_warning"] = (
+                "The prediction completed, but the explainability visualization could not be generated."
+            )
         return details
 
     @staticmethod

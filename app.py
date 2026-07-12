@@ -23,7 +23,10 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object("config.Config")
     Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
-    prediction_service = PredictionService(Path(app.config["MODEL_DIR"]))
+    prediction_service = PredictionService(
+        Path(app.config["MODEL_DIR"]),
+        Path(app.config["UPLOAD_DIR"]),
+    )
 
     @app.get("/")
     def home() -> str:
@@ -62,6 +65,9 @@ def create_app() -> Flask:
             return redirect(url_for("prediction"))
 
         result["image_url"] = url_for("static", filename=f"uploads/{filename}")
+        if result.get("heatmap_path"):
+            heatmap_filename = Path(str(result["heatmap_path"])).name
+            result["heatmap_url"] = url_for("static", filename=f"uploads/heatmaps/{heatmap_filename}")
         session["prediction_result"] = result
         return redirect(url_for("results"))
 
