@@ -20,7 +20,6 @@ def _allowed_file(filename: str) -> bool:
 
 def create_app() -> Flask:
     """Create and configure the RetinaAI Flask application."""
-    import os
     import sys
 
     _model_path = Path(__file__).resolve().parent / "models" / "retina_model.keras"
@@ -33,14 +32,9 @@ def create_app() -> Flask:
             "Production model not found: models/retina_model.keras"
         )
 
-    if os.environ.get("RENDER"):
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
     import tensorflow as tf
     print(f"Python version: {sys.version}")
     print(f"TensorFlow version: {tf.__version__}")
-    print(f"TensorFlow CPUs: {len(tf.config.list_physical_devices('CPU'))}")
-    print(f"TensorFlow GPUs: {len(tf.config.list_physical_devices('GPU'))}")
 
     app = Flask(__name__)
     app.config.from_object("config.Config")

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import gc
-import os
 from io import BytesIO
 from pathlib import Path
 
@@ -92,8 +90,7 @@ class PredictionService:
     def analyze(self, image_path: Path) -> dict[str, object]:
         """Run one image through the saved classifier and return presentation data."""
         model = self._load_model()
-        image_batch = self._prepare_image(image_path)
-        probabilities = model.predict(image_batch, verbose=0)[0]
+        probabilities = model.predict(self._prepare_image(image_path), verbose=0)[0]
         predicted_class = int(np.argmax(probabilities))
         details = CLASSIFICATIONS[predicted_class].copy()
         details.update(
@@ -104,26 +101,19 @@ class PredictionService:
                 "labels": [CLASSIFICATIONS[index]["name"] for index in range(5)],
             }
         )
-        del probabilities
-        gc.collect()
-
-        if os.environ.get("ENABLE_GRADCAM", "true").lower() == "true":
-            try:
-                heatmap_path = generate_gradcam(
-                    model=model,
-                    image_batch=image_batch,
-                    predicted_class=predicted_class,
-                    source_image_path=image_path,
-                    output_dir=self.heatmaps_dir,
-                )
-                details["heatmap_path"] = str(heatmap_path)
-            except Exception:
-                details["gradcam_warning"] = (
-                    "The prediction completed, but the explainability visualization could not be generated."
-                )
-
-        del image_batch
-        gc.collect()
+        try:
+            heatmap_path = generate_gradcam(
+                model=model,
+                image_batch=self._prepare_image(image_path),
+                predicted_class=predicted_class,
+                source_image_path=image_path,
+                output_dir=self.heatmaps_dir,
+            )
+            details["heatmap_path"] = str(heatmap_path)
+        except Exception:
+            details["gradcam_warning"] = (
+                "The prediction completed, but the explainability visualization could not be generated."
+            )
         return details
 
     @staticmethod
