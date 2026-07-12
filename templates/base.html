@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}RetinaAI{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light site-nav sticky-top">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('home') }}"><span class="brand-mark"><i class="bi bi-eye-fill"></i></span><span>Retina<span>AI</span></span></a>
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu"><i class="bi bi-list fs-3"></i></button>
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('home') }}">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('prediction') }}">Prediction</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('about') }}">About</a></li>
+          <li class="nav-item"><a class="nav-link" href="https://github.com/" target="_blank" rel="noreferrer"><i class="bi bi-github me-1"></i>GitHub</a></li>
+          <li class="nav-item ms-lg-2"><a class="btn btn-primary btn-sm px-3" href="{{ url_for('prediction') }}">Start analysis</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}<div class="container pt-4">{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}<button class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}</div>{% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer"><div class="container"><div class="row g-4 align-items-center"><div class="col-md-7"><a class="footer-brand" href="{{ url_for('home') }}">RetinaAI</a><p class="mb-0">Medical disclaimer: RetinaAI supports clinical decision-making and is not a substitute for a qualified healthcare professional.</p></div><div class="col-md-5 text-md-end"><a href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a><a href="#" aria-label="LinkedIn placeholder">LinkedIn</a><p class="mb-0 mt-2">© 2026 RetinaAI. All rights reserved.</p></div></div></div></footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
