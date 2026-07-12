@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from uuid import uuid4
 
@@ -9,9 +10,10 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
+logger = logging.getLogger(__name__)
+
 
 def _find_backbone(model: tf.keras.Model) -> tf.keras.Model:
-    """Locate the nested EfficientNetB0 model in the trained classifier."""
     for layer in model.layers:
         if isinstance(layer, tf.keras.Model) and "efficientnetb0" in layer.name.lower():
             return layer
@@ -19,7 +21,6 @@ def _find_backbone(model: tf.keras.Model) -> tf.keras.Model:
 
 
 def _find_last_convolutional_layer(backbone: tf.keras.Model) -> tf.keras.layers.Layer:
-    """Return the final convolutional feature layer in EfficientNetB0."""
     convolutional_layers = [
         layer
         for layer in backbone.layers
@@ -30,11 +31,6 @@ def _find_last_convolutional_layer(backbone: tf.keras.Model) -> tf.keras.layers.
     return convolutional_layers[-1]
 
 
-def _classifier_layers(model: tf.keras.Model, backbone: tf.keras.Model) -> list[tf.keras.layers.Layer]:
-    """Return the unchanged classification head layers after the backbone."""
-    return list(model.layers[model.layers.index(backbone) + 1 :])
-
-
 def generate_gradcam(
     model: tf.keras.Model,
     image_batch: np.ndarray,
@@ -42,26 +38,40 @@ def generate_gradcam(
     source_image_path: Path,
     output_dir: Path,
 ) -> Path:
-    """Generate and save a normalized Grad-CAM overlay for one prediction."""
     backbone = _find_backbone(model)
     last_conv_layer = _find_last_convolutional_layer(backbone)
+
+    backbone_idx = model.layers.index(backbone)
+    classifier_layers = model.layers[backbone_idx + 1:]
+
+    backbone_input = backbone.input
+    if isinstance(backbone_input, (list, tuple)):
+        backbone_input = backbone_input[0]
+
     backbone_grad_model = tf.keras.Model(
-        inputs=backbone.inputs,
+        inputs=backbone_input,
         outputs=[last_conv_layer.output, backbone.output],
     )
 
     with tf.GradientTape() as tape:
-        convolution_output, features = backbone_grad_model(image_batch, training=False)
-        predictions = features
-        for layer in _classifier_layers(model, backbone):
+        conv_output, backbone_features = backbone_grad_model(image_batch, training=False)
+        predictions = backbone_features
+        for layer in classifier_layers:
             predictions = layer(predictions, training=False)
         class_score = predictions[:, predicted_class]
 
-    gradients = tape.gradient(class_score, convolution_output)
+    gradients = tape.gradient(class_score, conv_output)
     if gradients is None:
-        raise RuntimeError("Grad-CAM gradients could not be calculated.")
+        raise RuntimeError(
+            "Grad-CAM gradients could not be calculated. "
+            "The gradient tape could not trace from the classifier output "
+            "back to the last convolutional layer. Verify that "
+            "backbone.input resolves to a valid tensor and that "
+            "classifier_layers connect to backbone.output."
+        )
+
     weights = tf.reduce_mean(gradients, axis=(0, 1, 2))
-    heatmap = tf.reduce_sum(convolution_output[0] * weights, axis=-1)
+    heatmap = tf.reduce_sum(conv_output[0] * weights, axis=-1)
     heatmap = tf.maximum(heatmap, 0)
     maximum = tf.reduce_max(heatmap)
     if float(maximum) == 0:
@@ -79,4 +89,6 @@ def generate_gradcam(
     output_path = output_dir / f"{source_image_path.stem}_gradcam_{uuid4().hex[:8]}.png"
     if not cv2.imwrite(str(output_path), overlay):
         raise IOError(f"Could not save Grad-CAM overlay: {output_path}")
+
+    logger.info("Saved Grad-CAM overlay to %s", output_path)
     return output_path

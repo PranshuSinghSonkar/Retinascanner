@@ -101,6 +101,7 @@ class PredictionService:
                 "labels": [CLASSIFICATIONS[index]["name"] for index in range(5)],
             }
         )
+        import traceback
         try:
             heatmap_path = generate_gradcam(
                 model=model,
@@ -111,6 +112,7 @@ class PredictionService:
             )
             details["heatmap_path"] = str(heatmap_path)
         except Exception:
+            traceback.print_exc()
             details["gradcam_warning"] = (
                 "The prediction completed, but the explainability visualization could not be generated."
             )
